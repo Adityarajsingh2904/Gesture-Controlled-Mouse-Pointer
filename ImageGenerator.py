@@ -1,4 +1,5 @@
 import camera as camera
+import tensorflow as tf
 import cv2
 import imutils
 import numpy as np
@@ -7,6 +8,30 @@ import logging
 logging.basicConfig(level=logging.ERROR)
 
 bg = None
+
+def augment_image(img, zoom_range=0.1):
+    """Apply random flip, brightness and zoom to the captured image."""
+    tensor = tf.convert_to_tensor(img, dtype=tf.float32) / 255.0
+    if len(tensor.shape) == 2:
+        tensor = tf.expand_dims(tensor, -1)
+    tensor = tf.image.random_flip_left_right(tensor)
+    tensor = tf.image.random_brightness(tensor, 0.2)
+    orig_shape = tf.shape(tensor)[:2]
+    scale = tf.random.uniform([], 0.9, 1.0)
+    new_size = tf.cast(tf.cast(orig_shape, tf.float32) * scale, tf.int32)
+    tensor = tf.image.random_crop(tensor, tf.concat([new_size, [tf.shape(tensor)[-1]]], 0))
+    tensor = tf.image.resize(tensor, orig_shape)
+    tensor = tf.clip_by_value(tensor, 0.0, 1.0)
+    tensor = tf.image.convert_image_dtype(tensor, tf.uint8)
+    return tf.squeeze(tensor).numpy()
+
+def save_augmented(img, folder, prefix, idx, augments=2):
+    """Save image and several augmented versions."""
+    cv2.imwrite(f"{folder}/{prefix}_{idx}.png", img)
+    for i in range(augments):
+        aug = augment_image(img)
+        cv2.imwrite(f"{folder}/{prefix}_{idx}_aug{i}.png", aug)
+
 
 def run_avg(image, aWeight):
     global bg
@@ -62,7 +87,7 @@ def main():
                     (thresholded, segmented) = hand
                     cv2.drawContours(clone, [segmented + (right, top)], -1, (0, 0, 255))
                     if start_recording:
-                        cv2.imwrite("Dataset/YoImages/yo_" + str(image_num) + '.png', thresholded)
+                        save_augmented(thresholded, "Dataset/YoImages", "yo", image_num)
                         image_num += 1
                     cv2.imshow("Thesholded", thresholded)
             cv2.rectangle(clone, (left, top), (right, bottom), (0, 255, 0), 2)
