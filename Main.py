@@ -62,8 +62,11 @@ def main():
     num_frames = 0
     start_recording = False
     n=0
-    while (True):
-        (grabbed, frame) = camera.read()
+    while True:
+        grabbed, frame = camera.read()
+        if not grabbed:
+            logging.error("Failed to grab frame from camera")
+            break
         frame = imutils.resize(frame, width=700)
         frame = cv2.flip(frame, 1)
         clone = frame.copy()
@@ -106,9 +109,16 @@ def main():
 
 def getPredictedClass():
     image = cv2.imread('Temp.png')
-    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    if image is None:
+        logging.error('Temp.png could not be read')
+        return 0, 0
     try:
-        prediction = model.predict(gray_image.reshape(1,89,100,1))
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    except Exception:
+        logging.exception('Failed to convert Temp.png to grayscale')
+        return 0, 0
+    try:
+        prediction = model.predict(gray_image.reshape(1, 89, 100, 1))
     except Exception:
         logging.exception("Model prediction failed")
         return 0, 0
