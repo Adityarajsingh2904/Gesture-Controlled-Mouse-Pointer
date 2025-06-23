@@ -2,6 +2,9 @@ import camera as camera
 import cv2
 import imutils
 import numpy as np
+import logging
+
+logging.basicConfig(level=logging.ERROR)
 
 bg = None
 
@@ -26,7 +29,14 @@ def segment(image, threshold=25):
 
 def main():
     aWeight = 0.5
-    camera = cv2.VideoCapture(0)
+    try:
+        camera = cv2.VideoCapture(0)
+    except Exception:
+        logging.exception("Failed to access camera")
+        return
+    if not camera.isOpened():
+        logging.error("Camera could not be opened")
+        return
     top, right, bottom, left = 100, 400, 300, 600
     num_frames = 0
     image_num = 0
