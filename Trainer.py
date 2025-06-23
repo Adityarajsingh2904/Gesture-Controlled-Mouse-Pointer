@@ -1,8 +1,5 @@
 import tensorflow as tf
-import tflearn
-from tflearn.layers.conv import conv_2d, max_pool_2d
-from tflearn.layers.core import input_data, dropout, fully_connected
-from tflearn.layers.estimator import regression
+from tensorflow.keras import layers, models
 import numpy as np
 import cv2
 from sklearn.utils import shuffle
@@ -114,30 +111,33 @@ for i in range(0, 100):
     testLabels.append([0, 0, 0, 0, 1, 0])
 
 for i in range(0, 100):
-    testLabels.append([0, 0, 0, 0, 1, 0])
+    testLabels.append([0, 0, 0, 0, 0, 1])
 
-tf.reset_default_graph()
+# Build model using Keras
+model = models.Sequential([
+    layers.Input(shape=(89, 100, 1)),
+    layers.Conv2D(32, 2, activation='relu'),
+    layers.MaxPooling2D(2),
+    layers.Conv2D(64, 2, activation='relu'),
+    layers.MaxPooling2D(2),
+    layers.Conv2D(128, 2, activation='relu'),
+    layers.MaxPooling2D(2),
+    layers.Conv2D(256, 2, activation='relu'),
+    layers.MaxPooling2D(2),
+    layers.Conv2D(256, 2, activation='relu'),
+    layers.MaxPooling2D(2),
+    layers.Conv2D(128, 2, activation='relu'),
+    layers.MaxPooling2D(2),
+    layers.Conv2D(64, 2, activation='relu'),
+    layers.MaxPooling2D(2),
+    layers.Flatten(),
+    layers.Dense(1000, activation='relu'),
+    layers.Dropout(0.25),
+    layers.Dense(6, activation='softmax')
+])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-convnet = input_data(shape=[None, 89, 100, 1], name='input')
-convnet = conv_2d(convnet, 32, 2, activation='relu')
-convnet = max_pool_2d(convnet, 2)
-convnet = conv_2d(convnet, 64, 2, activation='relu')
-convnet = max_pool_2d(convnet, 2)
-convnet = conv_2d(convnet, 128, 2, activation='relu')
-convnet = max_pool_2d(convnet, 2)
-convnet = conv_2d(convnet, 256, 2, activation='relu')
-convnet = max_pool_2d(convnet, 2)
-convnet = conv_2d(convnet, 256, 2, activation='relu')
-convnet = max_pool_2d(convnet, 2)
-convnet = conv_2d(convnet, 128, 2, activation='relu')
-convnet = max_pool_2d(convnet, 2)
-convnet = conv_2d(convnet, 64, 2, activation='relu')
-convnet = max_pool_2d(convnet, 2)
-convnet = fully_connected(convnet, 1000, activation='relu')
-convnet = dropout(convnet, 0.75)
-convnet = fully_connected(convnet, 6, activation='softmax')
-convnet = regression(convnet, optimizer='adam', learning_rate=0.001, loss='categorical_crossentropy', name='regression')
-model = tflearn.DNN(convnet, tensorboard_verbose=0)
 loadedImages, outputVectors = shuffle(loadedImages, outputVectors, random_state=0)
-model.fit(loadedImages, outputVectors, n_epoch=50, validation_set=(testImages, testLabels),snapshot_step=100, show_metric=True, run_id='convnet_coursera')
-model.save("TrainedNewModel/GestureRecogModel.tfl")
+model.fit(np.array(loadedImages), np.array(outputVectors), epochs=50,
+          validation_data=(np.array(testImages), np.array(testLabels)))
+model.save('TrainedNewModel/GestureRecogModel.h5')
