@@ -5,6 +5,9 @@ from PIL import Image
 import cv2
 import imutils
 import pyautogui
+import logging
+
+logging.basicConfig(level=logging.ERROR)
 
 bg = None
 n=0
@@ -16,7 +19,11 @@ i=0
 
 def resizeImage(imageName):
     basewidth = 100
-    img = Image.open(imageName)
+    try:
+        img = Image.open(imageName)
+    except Exception as e:
+        logging.exception("Failed to open image %s", imageName)
+        return
     wpercent = (basewidth / float(img.size[0]))
     hsize = int((float(img.size[1]) * float(wpercent)))
     img = img.resize((basewidth, hsize), Image.ANTIALIAS)
@@ -43,7 +50,14 @@ def segment(image, threshold=25):
 def main():
     global cX,cY,nX,nY
     aWeight = 0.5
-    camera = cv2.VideoCapture(0)
+    try:
+        camera = cv2.VideoCapture(0)
+    except Exception as e:
+        logging.exception("Failed to access camera")
+        return
+    if not camera.isOpened():
+        logging.error("Camera could not be opened")
+        return
     top, right, bottom, left = 110, 350, 325, 590
     num_frames = 0
     start_recording = False
@@ -93,7 +107,11 @@ def main():
 def getPredictedClass():
     image = cv2.imread('Temp.png')
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    prediction = model.predict(gray_image.reshape(1,89,100,1))
+    try:
+        prediction = model.predict(gray_image.reshape(1,89,100,1))
+    except Exception:
+        logging.exception("Model prediction failed")
+        return 0, 0
     return np.argmax(prediction), (np.amax(prediction) / np.sum(prediction))
 
 def showStatistics(predictedClass, confidence):

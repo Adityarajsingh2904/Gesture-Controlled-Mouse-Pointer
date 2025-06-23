@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
 from PIL import Image
+import logging
+
+logging.basicConfig(level=logging.ERROR)
 
 
 def load_config(path: str = "config.json"):
@@ -9,7 +12,11 @@ def load_config(path: str = "config.json"):
 
 
 def resize_image(image_name: str, basewidth: int, height: int):
-    img = Image.open(image_name)
+    try:
+        img = Image.open(image_name)
+    except Exception:
+        logging.exception("Failed to open image %s", image_name)
+        return
     img = img.resize((basewidth, height), Image.ANTIALIAS)
     img.save(image_name)
 
