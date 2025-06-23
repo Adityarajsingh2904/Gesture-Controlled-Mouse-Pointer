@@ -1,0 +1,2 @@
+model_checkpoint_path: "C:\\Users\\ayroy\\Downloads\\Gesture Controlled Mouse Pointer\\TrainedNewModel\\GestureRecogModel.tfl"
+all_model_checkpoint_paths: "C:\\Users\\ayroy\\Downloads\\Gesture Controlled Mouse Pointer\\TrainedNewModel\\GestureRecogModel.tfl"
