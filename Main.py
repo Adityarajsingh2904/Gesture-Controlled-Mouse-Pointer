@@ -5,13 +5,15 @@ from PIL import Image
 import cv2
 import imutils
 import pyautogui
+import logging
+
+logging.basicConfig(level=logging.ERROR)
 
 
 class GestureMouseController:
     """Controller that maps hand gestures to mouse actions."""
 
     def __init__(self):
-        # tracking variables
         self.bg = None
         self.n = 0
         self.cX = 0
@@ -22,7 +24,6 @@ class GestureMouseController:
         self.model = self._load_model()
 
     def _load_model(self):
-        """Load the gesture recognition model."""
         model = models.Sequential([
             layers.Input(shape=(89, 100, 1)),
             layers.Conv2D(32, 2, activation='relu'),
@@ -51,9 +52,13 @@ class GestureMouseController:
     @staticmethod
     def resize_image(image_name):
         basewidth = 100
-        img = Image.open(image_name)
+        try:
+            img = Image.open(image_name)
+        except Exception:
+            logging.exception("Failed to open image %s", image_name)
+            return
         wpercent = basewidth / float(img.size[0])
-        hsize = int((float(img.size[1]) * float(wpercent)))
+        hsize = int(float(img.size[1]) * wpercent)
         img = img.resize((basewidth, hsize), Image.ANTIALIAS)
         img.save(image_name)
 
@@ -76,8 +81,19 @@ class GestureMouseController:
 
     def get_predicted_class(self):
         image = cv2.imread('Temp.png')
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        prediction = self.model.predict(gray_image.reshape(1, 89, 100, 1))
+        if image is None:
+            logging.error('Temp.png could not be read')
+            return 0, 0
+        try:
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        except Exception:
+            logging.exception('Failed to convert Temp.png to grayscale')
+            return 0, 0
+        try:
+            prediction = self.model.predict(gray_image.reshape(1, 89, 100, 1))
+        except Exception:
+            logging.exception("Model prediction failed")
+            return 0, 0
         return np.argmax(prediction), (np.amax(prediction) / np.sum(prediction))
 
     def show_statistics(self, predicted_class, confidence):
@@ -141,19 +157,32 @@ class GestureMouseController:
 
     def run(self):
         aWeight = 0.5
-        camera = cv2.VideoCapture(0)
+        try:
+            camera = cv2.VideoCapture(0)
+        except Exception:
+            logging.exception("Failed to access camera")
+            return
+        if not camera.isOpened():
+            logging.error("Camera could not be opened")
+            return
+
         top, right, bottom, left = 110, 350, 325, 590
         num_frames = 0
         start_recording = False
         self.n = 0
+
         while True:
             grabbed, frame = camera.read()
+            if not grabbed:
+                logging.error("Failed to grab frame from camera")
+                break
             frame = imutils.resize(frame, width=700)
             frame = cv2.flip(frame, 1)
             clone = frame.copy()
             roi = frame[top:bottom, right:left]
             gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
             gray = cv2.GaussianBlur(gray, (7, 7), 0)
+
             if num_frames < 30:
                 self.run_avg(gray, aWeight)
             else:
@@ -170,13 +199,14 @@ class GestureMouseController:
                             self.nY = self.cY
                         cv2.circle(clone, (self.cX, self.cY), 3, (255, 255, 255), -1)
                     except Exception:
-                        print("Empty")
+                        logging.exception("Failed to compute hand centroid")
                     if start_recording:
                         cv2.imwrite('Temp.png', thresholded)
                         self.resize_image('Temp.png')
                         predicted_class, confidence = self.get_predicted_class()
                         self.show_statistics(predicted_class, confidence)
                     cv2.imshow("Thesholded", thresholded)
+
             cv2.rectangle(clone, (left, top), (right, bottom), (0, 255, 0), 2)
             cv2.rectangle(clone, (375, 215), (565, 305), (255, 0, 0), 1)
             num_frames += 1
@@ -186,6 +216,7 @@ class GestureMouseController:
                 break
             if keypress == ord("s"):
                 start_recording = True
+
         camera.release()
         cv2.destroyAllWindows()
 
