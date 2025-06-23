@@ -1,4 +1,3 @@
-import tensorflow as tf
 from tensorflow.keras import layers, models
 import numpy as np
 from PIL import Image
@@ -24,35 +23,39 @@ class GestureMouseController:
         self.i = 0
         self.model = self._load_model()
         self.mp_hands = mp.solutions.hands
-        self.hands = self.mp_hands.Hands(max_num_hands=1,
-                                          min_detection_confidence=0.7,
-                                          min_tracking_confidence=0.7)
+        self.hands = self.mp_hands.Hands(
+            max_num_hands=1, min_detection_confidence=0.7, min_tracking_confidence=0.7
+        )
         self.drawing = mp.solutions.drawing_utils
 
     def _load_model(self):
-        model = models.Sequential([
-            layers.Input(shape=(89, 100, 1)),
-            layers.Conv2D(32, 2, activation='relu'),
-            layers.MaxPooling2D(2),
-            layers.Conv2D(64, 2, activation='relu'),
-            layers.MaxPooling2D(2),
-            layers.Conv2D(128, 2, activation='relu'),
-            layers.MaxPooling2D(2),
-            layers.Conv2D(256, 2, activation='relu'),
-            layers.MaxPooling2D(2),
-            layers.Conv2D(256, 2, activation='relu'),
-            layers.MaxPooling2D(2),
-            layers.Conv2D(128, 2, activation='relu'),
-            layers.MaxPooling2D(2),
-            layers.Conv2D(64, 2, activation='relu'),
-            layers.MaxPooling2D(2),
-            layers.Flatten(),
-            layers.Dense(1000, activation='relu'),
-            layers.Dropout(0.25),
-            layers.Dense(6, activation='softmax')
-        ])
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.load_weights('TrainedNewModel/GestureRecogModel.h5')
+        model = models.Sequential(
+            [
+                layers.Input(shape=(89, 100, 1)),
+                layers.Conv2D(32, 2, activation="relu"),
+                layers.MaxPooling2D(2),
+                layers.Conv2D(64, 2, activation="relu"),
+                layers.MaxPooling2D(2),
+                layers.Conv2D(128, 2, activation="relu"),
+                layers.MaxPooling2D(2),
+                layers.Conv2D(256, 2, activation="relu"),
+                layers.MaxPooling2D(2),
+                layers.Conv2D(256, 2, activation="relu"),
+                layers.MaxPooling2D(2),
+                layers.Conv2D(128, 2, activation="relu"),
+                layers.MaxPooling2D(2),
+                layers.Conv2D(64, 2, activation="relu"),
+                layers.MaxPooling2D(2),
+                layers.Flatten(),
+                layers.Dense(1000, activation="relu"),
+                layers.Dropout(0.25),
+                layers.Dense(6, activation="softmax"),
+            ]
+        )
+        model.compile(
+            optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"]
+        )
+        model.load_weights("TrainedNewModel/GestureRecogModel.h5")
         return model
 
     @staticmethod
@@ -83,7 +86,9 @@ class GestureMouseController:
         x2, y2 = min(x2, w), min(y2, h)
         self.cX = int((x1 + x2) / 2)
         self.cY = int((y1 + y2) / 2)
-        self.drawing.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
+        self.drawing.draw_landmarks(
+            frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS
+        )
         return frame[y1:y2, x1:x2]
 
     def run_avg(self, image, aWeight):
@@ -97,7 +102,9 @@ class GestureMouseController:
             return None
         diff = cv2.absdiff(self.bg.astype("uint8"), image)
         thresholded = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)[1]
-        cnts, _ = cv2.findContours(thresholded.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts, _ = cv2.findContours(
+            thresholded.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
         if len(cnts) == 0:
             return None
         segmented = max(cnts, key=cv2.contourArea)
@@ -110,10 +117,12 @@ class GestureMouseController:
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             gray_image = cv2.resize(gray_image, (100, 89))
         except Exception:
-            logging.exception('Failed to preprocess frame for prediction')
+            logging.exception("Failed to preprocess frame for prediction")
             return 0, 0
         try:
-            prediction = self.model.predict(gray_image.reshape(1, 89, 100, 1), verbose=0)
+            prediction = self.model.predict(
+                gray_image.reshape(1, 89, 100, 1), verbose=0
+            )
         except Exception:
             logging.exception("Model prediction failed")
             return 0, 0
@@ -134,7 +143,7 @@ class GestureMouseController:
         elif predicted_class == 1:
             className = "Right Click - Palm"
             if self.n != 2:
-                pyautogui.click(button='right')
+                pyautogui.click(button="right")
                 self.n = 2
             self.i = 0
         elif predicted_class == 2:
@@ -174,8 +183,24 @@ class GestureMouseController:
         self.nX = self.cX
         self.nY = self.cY
         print(className)
-        cv2.putText(textImage, "Gesture : " + className, (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        cv2.putText(textImage, "Precision : " + str(confidence * 100) + '%', (30, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        cv2.putText(
+            textImage,
+            "Gesture : " + className,
+            (30, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (255, 255, 255),
+            2,
+        )
+        cv2.putText(
+            textImage,
+            "Precision : " + str(confidence * 100) + "%",
+            (30, 100),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (255, 255, 255),
+            2,
+        )
         cv2.imshow("Statistics", textImage)
 
     def run(self):
