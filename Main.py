@@ -6,6 +6,7 @@ import cv2
 import imutils
 import pyautogui
 import logging
+import mediapipe as mp
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -22,6 +23,11 @@ class GestureMouseController:
         self.nY = 0
         self.i = 0
         self.model = self._load_model()
+        self.mp_hands = mp.solutions.hands
+        self.hands = self.mp_hands.Hands(max_num_hands=1,
+                                          min_detection_confidence=0.7,
+                                          min_tracking_confidence=0.7)
+        self.drawing = mp.solutions.drawing_utils
 
     def _load_model(self):
         model = models.Sequential([
@@ -62,6 +68,24 @@ class GestureMouseController:
         img = img.resize((basewidth, hsize), Image.ANTIALIAS)
         img.save(image_name)
 
+    def extract_hand_roi(self, frame):
+        """Return cropped hand image using mediapipe detection."""
+        results = self.hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        if not results.multi_hand_landmarks:
+            return None
+        hand_landmarks = results.multi_hand_landmarks[0]
+        h, w, _ = frame.shape
+        x_coords = [lm.x for lm in hand_landmarks.landmark]
+        y_coords = [lm.y for lm in hand_landmarks.landmark]
+        x1, x2 = int(min(x_coords) * w) - 20, int(max(x_coords) * w) + 20
+        y1, y2 = int(min(y_coords) * h) - 20, int(max(y_coords) * h) + 20
+        x1, y1 = max(x1, 0), max(y1, 0)
+        x2, y2 = min(x2, w), min(y2, h)
+        self.cX = int((x1 + x2) / 2)
+        self.cY = int((y1 + y2) / 2)
+        self.drawing.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
+        return frame[y1:y2, x1:x2]
+
     def run_avg(self, image, aWeight):
         if self.bg is None:
             self.bg = image.copy().astype("float")
@@ -79,18 +103,17 @@ class GestureMouseController:
         segmented = max(cnts, key=cv2.contourArea)
         return thresholded, segmented
 
-    def get_predicted_class(self):
-        image = cv2.imread('Temp.png')
+    def get_predicted_class(self, image):
         if image is None:
-            logging.error('Temp.png could not be read')
             return 0, 0
         try:
             gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            gray_image = cv2.resize(gray_image, (100, 89))
         except Exception:
-            logging.exception('Failed to convert Temp.png to grayscale')
+            logging.exception('Failed to preprocess frame for prediction')
             return 0, 0
         try:
-            prediction = self.model.predict(gray_image.reshape(1, 89, 100, 1))
+            prediction = self.model.predict(gray_image.reshape(1, 89, 100, 1), verbose=0)
         except Exception:
             logging.exception("Model prediction failed")
             return 0, 0
@@ -156,7 +179,6 @@ class GestureMouseController:
         cv2.imshow("Statistics", textImage)
 
     def run(self):
-        aWeight = 0.5
         try:
             camera = cv2.VideoCapture(0)
         except Exception:
@@ -166,8 +188,6 @@ class GestureMouseController:
             logging.error("Camera could not be opened")
             return
 
-        top, right, bottom, left = 110, 350, 325, 590
-        num_frames = 0
         start_recording = False
         self.n = 0
 
@@ -179,37 +199,11 @@ class GestureMouseController:
             frame = imutils.resize(frame, width=700)
             frame = cv2.flip(frame, 1)
             clone = frame.copy()
-            roi = frame[top:bottom, right:left]
-            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (7, 7), 0)
+            roi = self.extract_hand_roi(clone)
+            if start_recording and roi is not None:
+                predicted_class, confidence = self.get_predicted_class(roi)
+                self.show_statistics(predicted_class, confidence)
 
-            if num_frames < 30:
-                self.run_avg(gray, aWeight)
-            else:
-                hand = self.segment(gray)
-                if hand is not None:
-                    thresholded, segmented = hand
-                    cv2.drawContours(clone, [segmented + (right, top)], -1, (0, 0, 255))
-                    try:
-                        M = cv2.moments(segmented + (right, top))
-                        self.cX = int(M["m10"] / M["m00"])
-                        self.cY = int(M["m01"] / M["m00"])
-                        if self.nX == 0 and self.nY == 0:
-                            self.nX = self.cX
-                            self.nY = self.cY
-                        cv2.circle(clone, (self.cX, self.cY), 3, (255, 255, 255), -1)
-                    except Exception:
-                        logging.exception("Failed to compute hand centroid")
-                    if start_recording:
-                        cv2.imwrite('Temp.png', thresholded)
-                        self.resize_image('Temp.png')
-                        predicted_class, confidence = self.get_predicted_class()
-                        self.show_statistics(predicted_class, confidence)
-                    cv2.imshow("Thesholded", thresholded)
-
-            cv2.rectangle(clone, (left, top), (right, bottom), (0, 255, 0), 2)
-            cv2.rectangle(clone, (375, 215), (565, 305), (255, 0, 0), 1)
-            num_frames += 1
             cv2.imshow("Video Feed", clone)
             keypress = cv2.waitKey(1) & 0xFF
             if keypress == ord("q"):
@@ -218,6 +212,7 @@ class GestureMouseController:
                 start_recording = True
 
         camera.release()
+        self.hands.close()
         cv2.destroyAllWindows()
 
 
