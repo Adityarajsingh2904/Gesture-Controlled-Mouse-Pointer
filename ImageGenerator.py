@@ -1,13 +1,12 @@
-import camera as camera
 import tensorflow as tf
 import cv2
 import imutils
-import numpy as np
 import logging
 
 logging.basicConfig(level=logging.ERROR)
 
 bg = None
+
 
 def augment_image(img, zoom_range=0.1):
     """Apply random flip, brightness and zoom to the captured image."""
@@ -19,11 +18,14 @@ def augment_image(img, zoom_range=0.1):
     orig_shape = tf.shape(tensor)[:2]
     scale = tf.random.uniform([], 0.9, 1.0)
     new_size = tf.cast(tf.cast(orig_shape, tf.float32) * scale, tf.int32)
-    tensor = tf.image.random_crop(tensor, tf.concat([new_size, [tf.shape(tensor)[-1]]], 0))
+    tensor = tf.image.random_crop(
+        tensor, tf.concat([new_size, [tf.shape(tensor)[-1]]], 0)
+    )
     tensor = tf.image.resize(tensor, orig_shape)
     tensor = tf.clip_by_value(tensor, 0.0, 1.0)
     tensor = tf.image.convert_image_dtype(tensor, tf.uint8)
     return tf.squeeze(tensor).numpy()
+
 
 def save_augmented(img, folder, prefix, idx, augments=2):
     """Save image and several augmented versions."""
@@ -40,17 +42,21 @@ def run_avg(image, aWeight):
         return
     cv2.accumulateWeighted(image, bg, aWeight)
 
+
 def segment(image, threshold=25):
-    global bg
+    # use global background from run_avg
     diff = cv2.absdiff(bg.astype("uint8"), image)
     thresholded = cv2.threshold(diff, threshold, 255, cv2.THRESH_BINARY)[1]
-    cnts, hierarchy = cv2.findContours(thresholded.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    cnts, hierarchy = cv2.findContours(
+        thresholded.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+    )
 
     if len(cnts) == 0:
         return
     else:
         segmented = max(cnts, key=cv2.contourArea)
         return (thresholded, segmented)
+
 
 def main():
     aWeight = 0.5
@@ -67,9 +73,9 @@ def main():
     image_num = 0
     start_recording = False
 
-    while(True):
+    while True:
         (grabbed, frame) = camera.read()
-        if (grabbed == True):
+        if grabbed:
             frame = imutils.resize(frame, width=700)
             frame = cv2.flip(frame, 1)
             clone = frame.copy()
@@ -107,6 +113,7 @@ def main():
 
     camera.release()
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
