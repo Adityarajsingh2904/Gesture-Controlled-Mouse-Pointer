@@ -14,7 +14,6 @@ class GestureMouseController:
     """Controller that maps hand gestures to mouse actions."""
 
     def __init__(self):
-        # tracking variables
         self.bg = None
         self.n = 0
         self.cX = 0
@@ -25,7 +24,6 @@ class GestureMouseController:
         self.model = self._load_model()
 
     def _load_model(self):
-        """Load the gesture recognition model."""
         model = models.Sequential([
             layers.Input(shape=(89, 100, 1)),
             layers.Conv2D(32, 2, activation='relu'),
@@ -167,10 +165,12 @@ class GestureMouseController:
         if not camera.isOpened():
             logging.error("Camera could not be opened")
             return
+
         top, right, bottom, left = 110, 350, 325, 590
         num_frames = 0
         start_recording = False
         self.n = 0
+
         while True:
             grabbed, frame = camera.read()
             if not grabbed:
@@ -182,6 +182,7 @@ class GestureMouseController:
             roi = frame[top:bottom, right:left]
             gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
             gray = cv2.GaussianBlur(gray, (7, 7), 0)
+
             if num_frames < 30:
                 self.run_avg(gray, aWeight)
             else:
@@ -205,6 +206,7 @@ class GestureMouseController:
                         predicted_class, confidence = self.get_predicted_class()
                         self.show_statistics(predicted_class, confidence)
                     cv2.imshow("Thesholded", thresholded)
+
             cv2.rectangle(clone, (left, top), (right, bottom), (0, 255, 0), 2)
             cv2.rectangle(clone, (375, 215), (565, 305), (255, 0, 0), 1)
             num_frames += 1
@@ -214,6 +216,7 @@ class GestureMouseController:
                 break
             if keypress == ord("s"):
                 start_recording = True
+
         camera.release()
         cv2.destroyAllWindows()
 

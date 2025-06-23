@@ -80,6 +80,8 @@ def main():
             print("Error, Check Camera")
             break
 
-main()
-#camera.release()
-cv2.destroyAllWindows()
+    camera.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
